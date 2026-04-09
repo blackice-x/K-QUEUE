@@ -1,0 +1,254 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {uid}
+    // Fields:
+    //   - uid: string (required)
+    //   - username: string (required, 3-20 chars)
+    //   - avatar: string (optional)
+    //   - rank: string (required, enum)
+    //   - kd: number (optional)
+    //   - points: number (optional)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: queue
+    // Document ID: {uid}
+    // Fields:
+    //   - uid: string (required)
+    //   - username: string (required)
+    //   - rank: string (required)
+    //   - joinedAt: timestamp (required)
+    //   - status: string (required, enum: ['waiting', 'matched'])
+    //
+    // Collection: lobbies
+    // Document ID: {lobbyId}
+    // Fields:
+    //   - id: string (required)
+    //   - hostId: string (required)
+    //   - hostName: string (required)
+    //   - title: string (required, 3-50 chars)
+    //   - rankRequired: string (required)
+    //   - maxPlayers: number (required, 2-10)
+    //   - playerCount: number (required)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: matches
+    // Document ID: {matchId}
+    // Fields:
+    //   - id: string (required)
+    //   - teamA: list (required)
+    //   - teamB: list (required)
+    //   - status: string (required, enum)
+    //   - score: string (optional)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: tickets
+    // Document ID: {ticketId}
+    // Fields:
+    //   - uid: string (required)
+    //   - username: string (required)
+    //   - userEmail: string (required)
+    //   - title: string (required)
+    //   - subject: string (required)
+    //   - description: string (required)
+    //   - imageUrl: string (optional)
+    //   - status: string (required, enum: ['open', 'in-progress', 'closed'])
+    //   - createdAt: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.uid;
+    }
+
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid;
+    }
+
+    function uidNotModified() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == resource.data.uid;
+    }
+
+    function isValidRank(rank) {
+      return rank in ['Iron', 'Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Ascendant', 'Immortal', 'Radiant'];
+    }
+
+    function isValidUsername(username) {
+      return username is string && username.size() >= 3 && username.size() <= 20;
+    }
+
+    function isValidLobbyTitle(title) {
+      return title is string && title.size() >= 3 && title.size() <= 50;
+    }
+
+    function isRecent(time) {
+      return time > request.time - duration.value(5, 'm') && time < request.time + duration.value(5, 'm');
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return data.keys().hasAny(['uid', 'username', 'rank', 'createdAt', 'xp', 'division', 'streak', 'inventory', 'riotId', 'age', 'lastActiveDate', 'rankPosition', 'boostActiveUntil', 'shieldActiveUntil', 'lastUpdated']) &&
+             data.uid == request.auth.uid &&
+             isValidUsername(data.username) &&
+             isValidRank(data.rank) &&
+             data.createdAt is timestamp &&
+             (!('xp' in data) || data.xp is number) &&
+             (!('division' in data) || data.division is string) &&
+             (!('streak' in data) || data.streak is number) &&
+             (!('inventory' in data) || data.inventory is list) &&
+             (!('riotId' in data) || data.riotId is string) &&
+             (!('age' in data) || data.age is number);
+    }
+
+    function isValidXPLog(data) {
+      return data.keys().hasAll(['userId', 'xpEarned', 'reason', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.xpEarned is number &&
+             data.reason is string &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidUserChallenge(data) {
+      return data.keys().hasAll(['userId', 'challengeId', 'progress', 'completed', 'lastUpdated']) &&
+             data.userId == request.auth.uid &&
+             data.challengeId is string &&
+             data.progress is number &&
+             data.completed is bool &&
+             data.lastUpdated is timestamp;
+    }
+
+    function isValidQueueEntry(data) {
+      return data.keys().hasAll(['uid', 'username', 'rank', 'mode', 'joinedAt', 'status']) &&
+             data.uid == request.auth.uid &&
+             isValidRank(data.rank) &&
+             data.status in ['waiting', 'matched'] &&
+             data.joinedAt is timestamp;
+    }
+
+    function isValidLobby(data) {
+      return data.hostId is string &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 100 &&
+             data.maxPlayers is number && data.maxPlayers >= 2 && data.maxPlayers <= 20 &&
+             data.playerCount is number &&
+             data.players is list &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidMessage(data) {
+      return data.keys().hasAll(['senderId', 'senderName', 'text', 'createdAt']) &&
+             data.senderId == request.auth.uid &&
+             data.text is string && data.text.size() > 0 && data.text.size() <= 500 &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidTicket(data) {
+      return data.keys().hasAny(['uid', 'username', 'userEmail', 'title', 'subject', 'description', 'imageUrl', 'status', 'createdAt']) &&
+             data.uid == request.auth.uid &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 100 &&
+             data.subject is string &&
+             data.description is string && data.description.size() > 0 && data.description.size() <= 2000 &&
+             data.status in ['open', 'in-progress', 'closed'] &&
+             data.createdAt is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && isRecent(request.resource.data.createdAt);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && 
+                    request.resource.data.createdAt == resource.data.createdAt &&
+                    uidNotModified();
+    }
+
+    match /xp_logs/{logId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && isValidXPLog(request.resource.data) && isRecent(request.resource.data.createdAt);
+    }
+
+    match /challenges/{challengeId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /user_challenges/{userChallengeId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow write: if isAuthenticated() && isValidUserChallenge(request.resource.data) && isRecent(request.resource.data.lastUpdated);
+    }
+
+    match /rewards/{rewardId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /queue/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) && isValidQueueEntry(request.resource.data) && isRecent(request.resource.data.joinedAt);
+      allow update: if isOwner(userId) && isValidQueueEntry(request.resource.data) &&
+                    request.resource.data.joinedAt == resource.data.joinedAt;
+      allow delete: if isOwner(userId);
+    }
+
+    match /lobbies/{lobbyId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidLobby(request.resource.data) && isRecent(request.resource.data.createdAt);
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        // Host can update anything
+        (request.auth.uid == resource.data.hostId && isValidLobby(request.resource.data) && request.resource.data.createdAt == resource.data.createdAt) ||
+        // Others can update playerCount, players, and voiceParticipants (joining/leaving/voice toggle)
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['playerCount', 'players', 'voiceParticipants']) && 
+         isValidLobby(request.resource.data))
+      );
+      allow delete: if isAuthenticated() && (request.auth.uid == resource.data.hostId || isAdmin());
+
+      match /messages/{messageId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated() && isValidMessage(request.resource.data) && isRecent(request.resource.data.createdAt);
+      }
+    }
+
+    match /matches/{matchId} {
+      allow read: if isAuthenticated();
+      // Only system/admin should create matches, but for this demo we'll allow authenticated users
+      // In a real app, this would be an Edge Function or Admin SDK
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+    }
+
+    match /tickets/{ticketId} {
+      allow read: if isAuthenticated() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidTicket(request.resource.data) && isRecent(request.resource.data.createdAt);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+             (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+              request.auth.token.email == "muhammadbadsha12378@gmail.com");
+    }
+  }
+}

@@ -1,0 +1,202 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user profile information including rank, stats, and gaming ecosystem data.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The user's unique ID." },
+        "username": { "type": "string", "description": "The user's display name." },
+        "tag": { "type": "string", "description": "The user's tag (e.g., #1234)." },
+        "avatar": { "type": "string", "description": "URL to the user's avatar." },
+        "rank": { 
+          "type": "string", 
+          "enum": ["Iron", "Bronze", "Silver", "Gold", "Platinum", "Diamond", "Ascendant", "Immortal", "Radiant"],
+          "description": "The user's current rank."
+        },
+        "xp": { "type": "number", "description": "Total XP earned." },
+        "division": { 
+          "type": "string", 
+          "enum": ["Ensign", "Ranger", "Hero", "Legend"],
+          "description": "The user's current division based on XP."
+        },
+        "streak": { "type": "number", "description": "Current daily login streak." },
+        "lastActiveDate": { "type": "string", "format": "date", "description": "Last date the user was active." },
+        "rankPosition": { "type": "number", "description": "Current position on the leaderboard." },
+        "kd": { "type": "number", "description": "Kill/Death ratio." },
+        "hsPercent": { "type": "number", "description": "Headshot percentage." },
+        "winRate": { "type": "number", "description": "Win rate percentage." },
+        "matchesPlayed": { "type": "number", "description": "Total matches played." },
+        "points": { "type": "number", "description": "Rank points." },
+        "riotId": { "type": "string", "description": "The user's in-game Riot ID (NAME#TAG)." },
+        "age": { "type": "number", "description": "The user's age." },
+        "inventory": { 
+          "type": "array", 
+          "items": { 
+            "type": "object",
+            "properties": {
+              "itemName": { "type": "string" },
+              "quantity": { "type": "number" }
+            }
+          }
+        },
+        "boostActiveUntil": { "type": "string", "format": "date-time", "description": "Timestamp when the current XP boost expires." },
+        "shieldActiveUntil": { "type": "string", "format": "date-time", "description": "Timestamp when the current streak shield expires." },
+        "lastUpdated": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "username", "rank"]
+    },
+    "XPLog": {
+      "title": "XP Log",
+      "description": "History of XP earned by a user.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "xpEarned": { "type": "number" },
+        "reason": { "type": "string", "enum": ["match_win", "kill", "daily", "challenge", "ace"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Challenge": {
+      "title": "Challenge",
+      "description": "A daily or weekly mission.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "xpReward": { "type": "number" },
+        "type": { "type": "string", "enum": ["daily", "weekly"] },
+        "goal": { "type": "number" },
+        "metric": { "type": "string", "enum": ["kills", "matches", "wins", "aces"] }
+      }
+    },
+    "UserChallenge": {
+      "title": "User Challenge Progress",
+      "description": "Progress of a user on a specific challenge.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "challengeId": { "type": "string" },
+        "progress": { "type": "number" },
+        "completed": { "type": "boolean" },
+        "lastUpdated": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Reward": {
+      "title": "Reward",
+      "description": "Items that can be claimed by users.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "requiredXP": { "type": "number" },
+        "requiredDivision": { "type": "string" },
+        "stock": { "type": "number" },
+        "imageUrl": { "type": "string" }
+      }
+    },
+    "QueueEntry": {
+      "title": "Queue Entry",
+      "description": "Represents a user currently in the matchmaking queue.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "username": { "type": "string" },
+        "rank": { "type": "string" },
+        "joinedAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["waiting", "matched"] }
+      },
+      "required": ["uid", "username", "rank", "joinedAt"]
+    },
+    "Lobby": {
+      "title": "Lobby",
+      "description": "A custom game lobby.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "hostId": { "type": "string" },
+        "hostName": { "type": "string" },
+        "title": { "type": "string" },
+        "rankRequired": { "type": "string" },
+        "mode": { "type": "string", "enum": ["Competitive", "Custom"] },
+        "maxPlayers": { "type": "number" },
+        "playerCount": { "type": "number" },
+        "players": { "type": "array", "items": { "type": "string" } },
+        "partyCode": { "type": "string", "description": "Optional party code for the lobby." },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["hostId", "title", "maxPlayers"]
+    },
+    "Match": {
+      "title": "Match",
+      "description": "A generated match between two teams.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "teamA": { "type": "array", "items": { "type": "object" } },
+        "teamB": { "type": "array", "items": { "type": "object" } },
+        "status": { "type": "string", "enum": ["pending", "active", "completed"] },
+        "score": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "SupportTicket": {
+      "title": "Support Ticket",
+      "description": "A support request submitted by a user.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "username": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "title": { "type": "string" },
+        "subject": { "type": "string" },
+        "description": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "status": { "type": "string", "enum": ["open", "in-progress", "closed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "title", "subject", "description"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "UserProfile",
+      "description": "User profile documents."
+    },
+    "/queue/{uid}": {
+      "schema": "QueueEntry",
+      "description": "Active queue entries."
+    },
+    "/lobbies/{lobbyId}": {
+      "schema": "Lobby",
+      "description": "Custom game lobbies."
+    },
+    "/matches/{matchId}": {
+      "schema": "Match",
+      "description": "Match history and active matches."
+    },
+    "/tickets/{ticketId}": {
+      "schema": "SupportTicket",
+      "description": "User submitted support tickets."
+    },
+    "/xp_logs/{logId}": {
+      "schema": "XPLog",
+      "description": "XP earning history."
+    },
+    "/challenges/{challengeId}": {
+      "schema": "Challenge",
+      "description": "Available challenges."
+    },
+    "/user_challenges/{userChallengeId}": {
+      "schema": "UserChallenge",
+      "description": "User progress on challenges."
+    },
+    "/rewards/{rewardId}": {
+      "schema": "Reward",
+      "description": "Available rewards."
+    }
+  }
+}

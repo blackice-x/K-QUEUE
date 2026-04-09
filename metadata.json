@@ -1,0 +1,5 @@
+{
+  "name": "K-Queue",
+  "description": "A high-end esports matchmaking platform for Kerala Valorant players featuring real-time queues, lobby systems, and team management.",
+  "requestFramePermissions": ["microphone"]
+}
